@@ -1,43 +1,54 @@
-
+const cluster = require('cluster');
 const app = require('express')();
-const puppeteer = require('puppeteer');
+const getScreenshot = require('./modules/screenshot');
+const numberOfWorkers = require('os').cpus().length;
 
-async function getScreenshot(url) {
+if (cluster.isMaster) {
+    console.log('Master with %s workers', numberOfWorkers);
 
-    const browser = await puppeteer.launch();
-    const page = await browser.newPage();
-    page.setViewport({ width: 1024, height: 768 });
-    await page.goto(url, {timeout: 18000} );
-    const result = await page.screenshot({ type: 'png', fullPage: true });
-    await page.waitFor(500);
-    await browser.close();
+    for (let i = 0; i < numberOfWorkers; ++i) {
+        let worker = cluster.fork().process;
+        console.log('Worker %s started.', worker.pid);
+    }
 
-    return result;
+    cluster.on('exit', function(worker) {
+        console.log('Worker %s died. restart...', worker.process.pid);
+        cluster.fork();
+    });
+
+} else {
+
+    app.get('/screenshot', async (req, res) => {
+
+        try {
+
+            console.log('WorkerId: ' + process.pid);
+
+            const url = req.query.url;
+    
+            console.log(`WorkerId ${process.pid} Url start: ${url}`);
+    
+            const result = await getScreenshot(url);
+    
+            console.log(`WorkerId ${process.pid} Url end: ${url}`);
+    
+            res.contentType('application/json');
+    
+            res.send(JSON.stringify({
+                status: true,
+                image: result.toString('base64')
+                }));
+        
+        } catch (err) {
+            console.log(err);
+            res.end(JSON.stringify({ status: false, image: ''}));    
+        }
+    });
+    
+    app.listen(3000, () => console.log('Listening on port 3000'));
 }
 
 process.on('uncaughtException', (err) => {
     console.log(err);
     process.exit(1);
 });
-
-app.get('/screenshot', async (req, res) => {
-
-    try {
-        const result = await getScreenshot(req.query.url);
-
-        res.writeHead(200, { 
-            'content-type': 'image/png'
-        });
-
-        res.end(result, 'binary');
-        
-    } catch (error) {
-        res.end('', 'binary');    
-    }
-});
-
-app.listen(3000, () => console.log('Listening on port 3000'));
-
-
-
-
