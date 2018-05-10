@@ -4,51 +4,46 @@ const getScreenshot = require('./modules/screenshot');
 const numberOfWorkers = require('os').cpus().length;
 
 if (cluster.isMaster) {
-    console.log('Master with %s workers', numberOfWorkers);
+	console.log('Master with %s workers', numberOfWorkers);
 
-    for (let i = 0; i < numberOfWorkers; ++i) {
-        let worker = cluster.fork().process;
-        console.log('Worker %s started.', worker.pid);
-    }
+	for (let i = 0; i < numberOfWorkers; i += 1) {
+		const worker = cluster.fork().process;
+		console.log('Worker %s started.', worker.pid);
+	}
 
-    cluster.on('exit', function(worker) {
-        console.log('Worker %s died. restart...', worker.process.pid);
-        cluster.fork();
-    });
-
+	cluster.on('exit', (worker) => {
+		console.log('Worker %s died. restart...', worker.process.pid);
+		cluster.fork();
+	});
 } else {
+	app.get('/screenshot', async (req, res) => {
+		try {
+			console.log(`WorkerId: ${process.pid}`);
 
-    app.get('/screenshot', async (req, res) => {
+			const url = req.query.url;
 
-        try {
+			console.log(`WorkerId ${process.pid} Url start: ${url}`);
 
-            console.log('WorkerId: ' + process.pid);
+			const result = await getScreenshot(url);
 
-            const url = req.query.url;
-    
-            console.log(`WorkerId ${process.pid} Url start: ${url}`);
-    
-            const result = await getScreenshot(url);
-    
-            console.log(`WorkerId ${process.pid} Url end: ${url}`);
-    
-            res.contentType('application/json');
-    
-            res.send(JSON.stringify({
-                status: true,
-                image: result.toString('base64')
-                }));
-        
-        } catch (err) {
-            console.log(err);
-            res.end(JSON.stringify({ status: false, image: ''}));    
-        }
-    });
-    
-    app.listen(3000, () => console.log('Listening on port 3000'));
+			console.log(`WorkerId ${process.pid} Url end: ${url}`);
+
+			res.contentType('application/json');
+
+			res.send(JSON.stringify({
+				status: true,
+				image: result.toString('base64'),
+			}));
+		} catch (err) {
+			console.log(err);
+			res.end(JSON.stringify({ status: false, image: '' }));
+		}
+	});
+
+	app.listen(3000, () => console.log('Listening on port 3000'));
 }
 
 process.on('uncaughtException', (err) => {
-    console.log(err);
-    process.exit(1);
+	console.log(err);
+	process.exit(1);
 });
