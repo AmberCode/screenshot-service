@@ -40,7 +40,7 @@ if (cluster.isMaster) {
 		}
 	});
 
-	app.listen(3000, () => console.log('Listening on port 3000'));
+	app.listen(5001, () => console.log('Listening on port 5001'));
 }
 
 process.on('uncaughtException', (err) => {
